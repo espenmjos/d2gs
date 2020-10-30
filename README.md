@@ -5,14 +5,22 @@ Intended to use as a private Diablo 2 game server in combination with pvpgn. See
 Tested together with a docker image of pvpgn on the same server. 
 
 # Build 
-Warning! Takes a long time to build and downloads over 1GB of data files. For continous build testing please map needed Diablo 2 files from a local folder.  
+Warning! Takes a long time to build and downloads over 1GB of data files. For continuous build testing please map needed Diablo 2 files from a local folder.  
+Clone repository:
 ```
 git clone https://github.com/espenmjos/d2gs.git
-edit conf/d2gs.reg with correct IP for "D2CSIP" and "D2DBSIP"
+```
+Edit conf/d2gs.reg 
+Set "D2CSIP" and "D2DBSIP" to server IP of docker host
 
 Build the image: 
 docker build -t d2gs:1.0.0 .
 ```
+# Run container
+```
+docker run -d --name d2gs --net=host d2gs:1.0.0
+```
+Have currently only tested with host network. 
 
 # Additional documentation
 
