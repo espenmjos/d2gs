@@ -20,6 +20,9 @@ RUN ../wine-source/configure --without-x
 RUN make -j 10 && make install -j 10
 
 RUN cd /home && wget https://github.com/pvpgn/pvpgn-magic-builder/archive/v2.29.tar.gz && tar xf v2.29.tar.gz && mv pvpgn-magic-builder-2.29/module/include/d2gs/1.13d d2gs
+COPY conf/d2gs.reg /home/d2gs/
+COPY conf/start.sh /home/d2gs/
+RUN winecfg
 RUN cd /home/d2gs && \
   wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Client.dll && \
   wget http://cdn.pvpgn.pro/diablo2/1.13d/D2CMP.dll && \
@@ -38,12 +41,9 @@ RUN cd /home/d2gs && \
   wget http://cdn.pvpgn.pro/diablo2/d2speech.mpq && \
   wget http://cdn.pvpgn.pro/diablo2/d2data.mpq && \
   wget http://cdn.pvpgn.pro/diablo2/d2sfx.mpq && \
-  wget http://cdn.pvpgn.pro/diablo2/d2exp.mpq 
+  wget http://cdn.pvpgn.pro/diablo2/d2exp.mpq && \
+  mv /home/d2gs /root/.wine/drive_c/d2gs 
 
-COPY conf/d2gs.reg /home/d2gs/
-COPY conf/start.sh /home/d2gs/
-RUN winecfg
-RUN mv /home/d2gs /root/.wine/drive_c/d2gs 
 WORKDIR "/root/.wine/drive_c/d2gs"
 RUN ["chmod", "+x", "./start.sh"]
 
