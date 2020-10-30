@@ -14,6 +14,7 @@ Edit conf/d2gs.reg
 Set "D2CSIP" and "D2DBSIP" to server IP of docker host
 
 Build the image: 
+```
 docker build -t d2gs:1.0.0 .
 ```
 # Run container
