@@ -5,7 +5,7 @@ Intended to use as a private Diablo 2 game server in combination with pvpgn. See
 Tested together with a docker image of pvpgn on the same server. I will also upload this soon.
 
 # Build 
-Warning! Takes a long time to build and downloads over 1GB of data files. For continuous build testing please map needed Diablo 2 files from a local folder.  
+Warning! Takes a long time to build (~30min for installing wine + download time of 1GB data + ~2min finilizing) and downloads over 1GB of data files. For continuous build testing please map needed Diablo 2 files from a local folder.  
 Clone repository:
 ```
 git clone https://github.com/espenmjos/d2gs.git
