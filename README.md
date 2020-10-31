@@ -1,8 +1,8 @@
 # d2gs
-Ubuntu Docker image of Diablo 2 Game Server
+Ubuntu Docker image of Diablo 2 Game Server v1.13d
 
 Intended to use as a private Diablo 2 game server in combination with pvpgn. See https://pvpgn.pro/d2gs_installation.html for overview. 
-Tested together with a docker image of pvpgn on the same server. 
+Tested together with a docker image of pvpgn on the same server. I will also upload this soon.
 
 # Build 
 Warning! Takes a long time to build and downloads over 1GB of data files. For continuous build testing please map needed Diablo 2 files from a local folder.  
@@ -17,11 +17,16 @@ Build the image:
 ```
 docker build -t d2gs:1.0.0 .
 ```
-# Run container
+
+Run container:
 ```
 docker run -d --name d2gs --net=host d2gs:1.0.0
 ```
 Have currently only tested with host network. 
+
+# Can it run on newer versions
+I have tried ubuntu image 18.04 without any luck, but did'nt use any time to figure it out. 
+I also tried wine 5.0.2, but the sock.c change cannot be copied and used directly so I gave up. 
 
 # Additional documentation
 
