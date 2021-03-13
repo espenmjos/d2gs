@@ -1,9 +1,9 @@
 # WORK ONGOING, CANNOT GUARANTY STABILITY
 # d2gs
-Ubuntu Docker image of Diablo 2 Game Server v1.13d
+Ubuntu Docker image of Diablo 2 Game Server v1.14d
 
 Intended to use as a private Diablo 2 game server in combination with pvpgn. See https://pvpgn.pro/d2gs_installation.html for overview. 
-Tested together with a docker image of pvpgn on the same server. I will also upload this soon.
+Tested together with a docker image of pvpgn on the same server. See https://github.com/espenmjos/pvpgn
 
 # Build 
 Warning! Takes a long time to build (~30min for installing wine + download time of 1GB data + ~2min finalizing) and downloads over 1GB of data files. For continuous build testing please map needed Diablo 2 files from a local folder.  
