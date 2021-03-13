@@ -1,4 +1,3 @@
-# WORK ONGOING, CANNOT GUARANTY STABILITY
 # d2gs
 Ubuntu Docker image of Diablo 2 Game Server v1.14d
 
