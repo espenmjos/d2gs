@@ -4,7 +4,7 @@ services:
   d2gs:
     container_name: d2gs
     build: .
-    image: d2gs:1.13d
+    image: d2gs:1.14d
     network_mode: host
    # ports:
    #   - 4000:4000
