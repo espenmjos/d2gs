@@ -29,7 +29,7 @@ docker-compose up -d
 I have only got this to work with host network. There are some address translation issues when using seperate docker network.
 
 # Can it run on newer versions
-I have tried ubuntu image 18.04 without any luck, but did'nt use any time to figure it out. 
+I have tried ubuntu image 18.04 without any luck, but didn't use any time to figure it out. 
 I also tried wine 5.0.2, but the sock.c change cannot be copied and used directly so I gave up. 
 
 # Additional documentation
