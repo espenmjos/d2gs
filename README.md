@@ -22,7 +22,11 @@ Run container:
 ```
 docker run -d --name d2gs --net=host d2gs:1.14d
 ```
-Have currently only tested with host network. 
+or
+```
+docker-compose up -d
+```
+I have only got this to work with host network. There are some address translation issues when using seperate docker network.
 
 # Can it run on newer versions
 I have tried ubuntu image 18.04 without any luck, but did'nt use any time to figure it out. 
@@ -30,26 +34,26 @@ I also tried wine 5.0.2, but the sock.c change cannot be copied and used directl
 
 # Additional documentation
 
-## Diablo 2 files repository
+### Diablo 2 files repository
 http://cdn.pvpgn.pro/
 
-## PvPGN Magic Builder
+### PvPGN Magic Builder
 https://github.com/pvpgn/pvpgn-magic-builder
 
-## Harpywar Diablo 2 Game Server 
+### Harpywar Diablo 2 Game Server 
 https://harpywar.com/?a=articles&b=2&c=2&d=21&lang=en
 
-## Pvpgn Battlenet server
+### Pvpgn Battlenet server
 https://github.com/pvpgn/pvpgn-server
 
-## TurBoss D2GS under Wine
+### TurBoss D2GS under Wine
 https://gist.github.com/TurBoss/3624782dd3d50b035e117f232063a999
 
-## D2GS Installation Guide
+### D2GS Installation Guide
 https://pvpgn.pro/d2gs_installation.html
 
-## PvPGN Server Docker wwmoraes
+### PvPGN Server Docker wwmoraes
 https://github.com/wwmoraes/pvpgn-server-docker
 
-## Diablo 2 Battlenet Tools
+### Diablo 2 Battlenet Tools
 https://github.com/fw42/diablo2
