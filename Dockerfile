@@ -38,8 +38,8 @@ RUN cd /home/d2gs && \
   wget http://cdn.pvpgn.pro/diablo2/1.13d/Storm.dll && \
   #wget http://cdn.pvpgn.pro/diablo2/1.13d/Patch_D2.mpq && \   
   #wget http://cdn.pvpgn.pro/diablo2/ijl11.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.14d/Patch_D2.mpq \
-  wget http://cdn.pvpgn.pro/diablo2/1.14d/ijl11.dll
+  wget http://cdn.pvpgn.pro/diablo2/1.14d/Patch_D2.mpq && \
+  wget http://cdn.pvpgn.pro/diablo2/1.14d/ijl11.dll && \
   wget http://cdn.pvpgn.pro/diablo2/d2speech.mpq && \
   wget http://cdn.pvpgn.pro/diablo2/d2data.mpq && \
   wget http://cdn.pvpgn.pro/diablo2/d2sfx.mpq && \
