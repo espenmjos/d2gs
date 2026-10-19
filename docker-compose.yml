@@ -1,11 +1,12 @@
-version: '2.0'
-
 services:
   d2gs:
-    container_name: d2gs
     build: .
     image: d2gs:1.14d
+    container_name: d2gs
+    restart: unless-stopped
+    # D2GS reports its own IP to d2cs, so it must share the host's network.
     network_mode: host
-   # ports:
-   #   - 4000:4000
-   #   - 4000:4000/udp
+    env_file: .env
+    # Optional: custom d2gs.reg / d2server.ini / d2warden.ini
+    # volumes:
+    #   - ./config:/config:ro
