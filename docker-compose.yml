@@ -1,12 +1,89 @@
+# Complete Diablo II closed realm: PvPGN (bnetd, d2cs, d2dbs) + D2GS.
+#
+#   cp .env.example .env   # set PUBLIC_IP
+#   docker compose up -d --build
+#
+# Everything runs on a private network with fixed addresses. PvPGN's address
+# translation replaces those internal addresses with PUBLIC_IP (or LAN_IP for
+# clients on LAN_NETWORK) before they are sent to game clients.
+
+x-pvpgn: &pvpgn
+  image: pvpgn:1.99.8
+  build: ${PVPGN_BUILD_CONTEXT:-https://github.com/espenmjos/pvpgn.git}
+  restart: unless-stopped
+  volumes:
+    - pvpgn-etc:/usr/local/etc/pvpgn
+    - pvpgn-var:/usr/local/var/pvpgn
+
+x-translation: &translation
+  PUBLIC_IP: ${PUBLIC_IP:?set PUBLIC_IP in .env}
+  LAN_IP: ${LAN_IP:-}
+  LAN_NETWORK: ${LAN_NETWORK:-}
+  TRANSLATE: 172.30.0.11:6113 172.30.0.20:4000
+
 services:
+  bnetd:
+    <<: *pvpgn
+    command: bnetd
+    environment:
+      <<: *translation
+      REALM_NAME: ${REALM_NAME:-D2CS}
+      REALM_DESCRIPTION: ${REALM_DESCRIPTION:-PvPGN Closed Realm}
+      D2CS_ADDR: 172.30.0.11:6113
+    ports:
+      - "6112:6112"
+      - "6112:6112/udp"
+    networks:
+      realm: { ipv4_address: 172.30.0.10 }
+
+  d2cs:
+    <<: *pvpgn
+    command: d2cs
+    environment:
+      <<: *translation
+      REALM_NAME: ${REALM_NAME:-D2CS}
+      BNETD_ADDR: 172.30.0.10:6112
+      D2GS_IPS: 172.30.0.20
+      D2GS_PASSWORD: ${D2GS_PASSWORD:-}
+    ports:
+      - "6113:6113"
+    networks:
+      realm: { ipv4_address: 172.30.0.11 }
+    depends_on: [bnetd]
+
+  d2dbs:
+    <<: *pvpgn
+    command: d2dbs
+    environment:
+      D2GS_IPS: 172.30.0.20
+    networks:
+      realm: { ipv4_address: 172.30.0.12 }
+    depends_on: [bnetd]
+
   d2gs:
     build: .
     image: d2gs:1.14d
-    container_name: d2gs
     restart: unless-stopped
-    # D2GS reports its own IP to d2cs, so it must share the host's network.
-    network_mode: host
-    env_file: .env
-    # Optional: custom d2gs.reg / d2server.ini / d2warden.ini
-    # volumes:
-    #   - ./config:/config:ro
+    environment:
+      D2CS_IP: 172.30.0.11
+      D2DBS_IP: 172.30.0.12
+      D2CS_SECRET: ${D2GS_PASSWORD:-}
+      MAX_GAMES: ${MAX_GAMES:-50}
+      MOTD: ${MOTD:-Welcome to Diablo II!}
+    ports:
+      - "4000:4000"
+      # Admin console, only reachable from the host itself
+      - "127.0.0.1:8888:8888"
+    networks:
+      realm: { ipv4_address: 172.30.0.20 }
+    depends_on: [d2cs, d2dbs]
+
+networks:
+  realm:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
+volumes:
+  pvpgn-etc:
+  pvpgn-var:

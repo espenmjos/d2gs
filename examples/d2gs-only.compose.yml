@@ -1,0 +1,15 @@
+# D2GS alone, for when PvPGN already runs somewhere else.
+# Uses host networking so D2GS reports the host's own IP to d2cs.
+#
+#   docker compose -f examples/d2gs-only.compose.yml --env-file .env up -d --build
+services:
+  d2gs:
+    build: ..
+    image: d2gs:1.14d
+    container_name: d2gs
+    restart: unless-stopped
+    network_mode: host
+    environment:
+      D2CS_IP: ${D2CS_IP:?set D2CS_IP in .env to the IP of your d2cs server}
+      D2CS_SECRET: ${D2GS_PASSWORD:-}
+      MOTD: ${MOTD:-Welcome to Diablo II!}

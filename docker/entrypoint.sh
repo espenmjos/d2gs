@@ -2,7 +2,17 @@
 # Writes the D2GS registry settings from environment variables, then starts D2GS.
 set -euo pipefail
 
-: "${D2CS_IP:?D2CS_IP must be set to the IP address of your PvPGN d2cs server}"
+: "${D2CS_IP:?D2CS_IP must be set to the IP address or hostname of your PvPGN d2cs server}"
+
+# D2GS only accepts IP addresses; resolve hostnames such as a compose service name.
+resolve() {
+  local ip
+  ip=$(getent ahostsv4 "$1" | awk 'NR==1 {print $1}')
+  [ -n "$ip" ] || { echo "Cannot resolve '$1'" >&2; exit 1; }
+  echo "$ip"
+}
+D2CS_IP=$(resolve "$D2CS_IP")
+[ -n "${D2DBS_IP:-}" ] && D2DBS_IP=$(resolve "$D2DBS_IP")
 D2DBS_IP="${D2DBS_IP:-$D2CS_IP}"
 D2CS_PORT="${D2CS_PORT:-6113}"
 D2DBS_PORT="${D2DBS_PORT:-6114}"
@@ -68,4 +78,9 @@ done
 
 echo "Connecting to d2cs at ${D2CS_IP}:${D2CS_PORT}, d2dbs at ${D2DBS_IP}:${D2DBS_PORT}"
 wine regedit "$REG"
+
+# D2GS writes its logs to files; mirror them to stdout for `docker logs`.
+touch d2gs.log d2ge.log
+tail -n0 -F d2gs.log d2ge.log 2>/dev/null &
+
 exec wine D2GS.exe

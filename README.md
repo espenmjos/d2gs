@@ -1,141 +1,157 @@
 # d2gs
 
-Docker image for the **Diablo II Closed Game Server (D2GS)**, running under a patched Wine on Ubuntu.
+Docker setup for a complete **Diablo II closed realm** (Battle.net-style, characters stored on the server):
 
-D2GS hosts the actual game sessions for a private Battle.net realm. It does nothing on its own: it needs a
-[PvPGN](https://github.com/pvpgn/pvpgn-server) server running `bnetd`, `d2cs` and `d2dbs`. For a ready-made
-PvPGN container, see [espenmjos/pvpgn](https://github.com/espenmjos/pvpgn).
+- **D2GS** 1.13d game server (with 1.14d `Patch_D2.mpq`), running under Wine 9 on Ubuntu 24.04
+- **PvPGN** 1.99.8 (`bnetd`, `d2cs`, `d2dbs`), built from [espenmjos/pvpgn](https://github.com/espenmjos/pvpgn)
 
-```
-Diablo II client ──► bnetd (6112) ──► d2cs (6113) ◄──── d2gs (this image, 4000)
-                                       d2dbs (6114) ◄───┘
-```
-
-| Component       | Version                                    |
-|-----------------|--------------------------------------------|
-| D2GS            | 1.13d (from PvPGN Magic Builder 2.29)      |
-| Game patch      | `Patch_D2.mpq` 1.14d                       |
-| Wine            | 2.0.1 + [HarpyWar's `sock.c` patch](https://gist.github.com/HarpyWar/cd3676fa4916ea163c50) |
-| Base image      | Ubuntu 16.04                               |
-
-## Requirements
-
-- Linux host with Docker (and Docker Compose)
-- A running PvPGN server with d2cs/d2dbs that this host can reach
-- ~3 GB free disk while building, ~1.5 GB for the final image
-- Patience for the first build: Wine is compiled from source (~30 min) and ~1 GB of game files is downloaded.
-  Later builds reuse the cached layers.
+One `docker compose up` starts the whole realm. Players connect with a Diablo II / LoD **1.14d** client.
 
 ## Quick start
 
 ```sh
 git clone https://github.com/espenmjos/d2gs.git
 cd d2gs
-cp .env.example .env
-# edit .env and set D2CS_IP to the IP of your PvPGN server
+cp .env.example .env          # set PUBLIC_IP (see below)
 docker compose up -d --build
-docker compose logs -f
+docker compose logs -f d2gs   # wait for "Game Server Activated by D2CS"
 ```
 
-That's it — no files need editing before the build. All settings are read from environment variables when the
-container starts, so changing the IP only needs a restart (`docker compose up -d`), not a rebuild.
+`PUBLIC_IP` is the address players use to reach this machine:
 
-Without Compose:
+| Who plays                     | Set                                                                   |
+|-------------------------------|-----------------------------------------------------------------------|
+| Only people on your LAN       | `PUBLIC_IP` = the machine's LAN IP, e.g. `192.168.1.10`                |
+| People on the internet        | `PUBLIC_IP` = your public IP, and forward ports 6112, 6113 and 4000 TCP (+ 6112 UDP) in your router |
+| Both                          | Public IP as above, plus `LAN_IP` and `LAN_NETWORK` so LAN players get the local address |
+
+Then point the game client at the server, e.g. with the
+[PvPGN gateway installer](https://github.com/pvpgn/battle.net-gateway-installer) or by adding `PUBLIC_IP` to the
+Battle.net gateway list in the registry.
+
+The first build downloads about 1 GB of game files and takes a few minutes. See [Game files](#game-files) to keep a
+local copy.
+
+## How it works
+
+```
+                          host ports            private network 172.30.0.0/24
+Diablo II client ──────►  6112  ──────────────►  bnetd   172.30.0.10
+                 ──────►  6113  ──────────────►  d2cs    172.30.0.11 ◄──┐
+                 ──────►  4000  ──────────────►  d2gs    172.30.0.20 ───┤
+                                                 d2dbs   172.30.0.12 ◄──┘
+```
+
+1. The client logs in to **bnetd** and picks the realm.
+2. bnetd tells the client where **d2cs** (the character server) is.
+3. When the player creates/joins a game, d2cs tells the client which **D2GS** to connect to.
+4. D2GS loads and saves characters through **d2dbs**.
+
+In steps 2 and 3 PvPGN sends an IP address to the client. Inside Docker those are private container addresses the
+client can't reach, so the stack uses PvPGN's **address translation** (`address_translation.conf`) to replace them
+with `PUBLIC_IP` (or `LAN_IP` for clients in `LAN_NETWORK`). That file, `realm.conf` and the realm-related keys in
+`d2cs.conf`/`d2dbs.conf` are written from environment variables on every start. The containers have fixed IPs so
+these addresses never change.
+
+## Configuration (`.env`)
+
+| Variable              | Default                 | Description |
+|-----------------------|-------------------------|-------------|
+| `PUBLIC_IP`           | *(required)*            | Address players use to reach the server |
+| `LAN_IP`              |                         | Address LAN players should use instead (optional) |
+| `LAN_NETWORK`         |                         | LAN in CIDR form, e.g. `192.168.1.0/24` (with `LAN_IP`) |
+| `REALM_NAME`          | `D2CS`                  | Realm name shown in the client |
+| `REALM_DESCRIPTION`   | `PvPGN Closed Realm`    | Realm description |
+| `MOTD`                | `Welcome to Diablo II!` | Message shown when joining a game |
+| `MAX_GAMES`           | `50`                    | Max concurrent games |
+| `D2GS_PASSWORD`       |                         | Shared secret between d2cs and D2GS |
+| `PVPGN_BUILD_CONTEXT` | GitHub repo             | Build PvPGN from a local checkout, e.g. `../pvpgn` |
+
+### PvPGN configuration and data
+
+PvPGN's config lives in the `pvpgn-etc` volume and accounts, characters and ladders in `pvpgn-var`. Edit config
+files with:
 
 ```sh
-docker build -t d2gs:1.14d .
-docker run -d --name d2gs --restart unless-stopped --network host \
-  -e D2CS_IP=192.168.1.10 \
-  d2gs:1.14d
+docker compose run --rm --entrypoint bash bnetd    # files are in /usr/local/etc/pvpgn
+docker compose restart
 ```
 
-> **Host networking is required.** D2GS tells d2cs which address clients should connect to. Behind Docker's bridge
-> network it would report the container's internal IP, and clients can't join games.
+Back up player data:
 
-## Configuration
+```sh
+docker run --rm -v d2gs_pvpgn-var:/data -v "$PWD":/backup ubuntu tar czf /backup/pvpgn-var.tgz -C /data .
+```
 
-| Variable              | Default                        | Description |
-|-----------------------|--------------------------------|-------------|
-| `D2CS_IP`             | *(required)*                   | IP of the d2cs server. Use the host's LAN/public IP, not `127.0.0.1`. |
-| `D2CS_PORT`           | `6113`                         | d2cs port |
-| `D2DBS_IP`            | same as `D2CS_IP`              | IP of the d2dbs server |
-| `D2DBS_PORT`          | `6114`                         | d2dbs port |
-| `D2CS_SECRET`         | *(empty)*                      | Shared secret; must match `d2gs_password` in `d2cs.conf` |
-| `MAX_GAMES`           | `50`                           | Max concurrent games |
-| `MAX_GAME_LIFE`       | `14400`                        | Max game lifetime in seconds |
-| `MAX_PREFER_USERS`    | `180`                          | Preferred max number of players |
-| `MOTD`                | `Welcome to Diablo II!`        | Message shown when joining a game |
-| `ADMIN_PORT`          | `8888`                         | Telnet admin console port |
-| `ADMIN_PASSWORD_HASH` | hash of `abcd123`              | Admin console password hash |
+### D2GS configuration
 
-### Advanced: custom config files
-
-Mount a directory at `/config` to override files completely:
-
-| File in `/config` | Effect |
-|-------------------|--------|
-| `d2gs.reg`        | Used instead of the generated registry settings (env vars are then ignored) |
-| `d2server.ini`    | Replaces D2GS's game rules / bug fixes config |
-| `d2warden.ini`    | Replaces the anti-hack (Warden) config |
-
-To start from the defaults, copy them out of the image:
+D2GS has more environment variables (`MAX_GAME_LIFE`, `MAX_PREFER_USERS`, `ADMIN_PORT`, `ADMIN_PASSWORD_HASH`, …) —
+see [`docker/entrypoint.sh`](docker/entrypoint.sh). To change game rules or Warden settings, mount a directory at
+`/config` in the `d2gs` service containing your own `d2server.ini` or `d2warden.ini` (or a full `d2gs.reg`):
 
 ```sh
 mkdir config
-docker run --rm --entrypoint cat d2gs:1.14d d2server.ini > config/d2server.ini
+docker compose run --rm --entrypoint cat d2gs d2server.ini > config/d2server.ini
+# edit, then add "- ./config:/config:ro" under volumes for d2gs in docker-compose.yml
 ```
 
-Then uncomment the `volumes:` section in `docker-compose.yml`.
+### Admin console
 
-## PvPGN side
-
-The PvPGN server must allow this game server to connect. Set the D2GS host IP in:
-
-- `d2cs.conf`: `gameservlist = <d2gs ip>`
-- `d2dbs.conf`: `gameservlist = <d2gs ip>`
-- `realm.conf`: the realm must point to the d2cs address reachable by clients
-
-If you use `D2CS_SECRET`, set the same value as `d2gs_password` in `d2cs.conf`.
-
-### Ports
-
-| Port | Proto | Service |
-|------|-------|---------|
-| 4000 | TCP   | D2GS game traffic — must be reachable by players |
-| 8888 | TCP   | D2GS telnet admin — keep firewalled |
-| 6112 | TCP/UDP | bnetd (PvPGN) |
-| 6113 | TCP   | d2cs (PvPGN) |
-| 6114 | TCP   | d2dbs (PvPGN, only needs to be reachable from D2GS) |
-
-## Admin console
+D2GS has a telnet admin console, published on `127.0.0.1:8888` only (default password `abcd123`):
 
 ```sh
-telnet <host> 8888    # default password: abcd123
+telnet 127.0.0.1 8888
 ```
 
-Change the password from the console, or set `ADMIN_PASSWORD_HASH` to a hash produced by D2GS.
+## Game files
+
+D2GS needs the Diablo II game files (~1 GB: MPQ archives, 1.13d DLLs and the 1.14d patch). The build uses whatever
+is in `./gamefiles/` and only downloads what's missing, from [cdn.pvpgn.pro](http://cdn.pvpgn.pro/). Everything is
+checked against [`scripts/gamefiles.md5`](scripts/gamefiles.md5).
+
+Download once and reuse for every build:
+
+```sh
+scripts/fetch-gamefiles.sh        # fills ./gamefiles
+```
+
+You can also copy the MPQ files from your own Diablo II installation into `./gamefiles/`.
+
+## Running only D2GS
+
+If PvPGN already runs elsewhere, use [`examples/d2gs-only.compose.yml`](examples/d2gs-only.compose.yml). It uses
+host networking so D2GS reports the host's own IP; set `D2CS_IP` in `.env` and add the D2GS host IP to
+`gameservlist` in both `d2cs.conf` and `d2dbs.conf`.
+
+```sh
+docker compose -f examples/d2gs-only.compose.yml --env-file .env up -d --build
+```
 
 ## Troubleshooting
 
-- **Players can see the realm but can't create/join games** — usually `D2CS_IP` points to `127.0.0.1` or a
-  container IP, port 4000 is blocked, or the container isn't running with host networking.
-- **D2GS can't connect to d2cs** — check that the D2GS host IP is in `gameservlist` in both `d2cs.conf` and
-  `d2dbs.conf`, and that `D2CS_SECRET` matches `d2gs_password`.
-- **Logs** — `docker compose logs -f`. Set `WINEDEBUG=` (empty) in `.env` for verbose Wine output.
+- **Realm shows up but you can't log in to it, or you can't create/join games:** `PUBLIC_IP` is wrong, or ports
+  6113/4000 aren't reachable. Check `docker compose logs d2cs` for `trans_load: Adding Host -> 172.30.0.20:4000,
+  Output -> <your ip>:4000`.
+- **D2GS doesn't connect:** `docker compose logs d2gs` should show `Game Server Activated by D2CS`. If not, check
+  that `D2GS_PASSWORD` hasn't been set by hand differently in `d2cs.conf`.
+- **Verbose Wine output:** set `WINEDEBUG=` (empty) in the `d2gs` environment.
 
-## Why such old versions?
+## Background: Wine and the old `sock.c` patch
 
-D2GS needs Wine with a patched `server/sock.c`. The patch is written for Wine 2.0.x; it doesn't apply to newer
-Wine (tried 5.0.2), and Ubuntu 16.04 is the newest base where this Wine builds cleanly (18.04 untested beyond a
-quick attempt). Contributions that move to a newer base are welcome.
+D2GS uses Windows' event-based sockets (`WSAEventSelect`). Windows reports "socket is writable" (`FD_WRITE`) only
+once after connecting, and again only after a send would have blocked. Old Wine versions reported it every time the
+socket was writable, flooding D2GS with events. Older D2GS-on-Wine guides therefore compiled Wine 2.0 with
+[HarpyWar's `sock.c` patch](https://gist.github.com/HarpyWar/cd3676fa4916ea163c50).
+
+Wine 7.0 rewrote its socket code to report each event only once until it is re-enabled, matching Windows. This image
+uses the stock Wine 9 package from Ubuntu 24.04 without any patch. Measured idle CPU usage is the same as with the
+patched Wine 2.0.1 (~5 % of one core), and builds take minutes instead of half an hour.
 
 ## References
 
 - [D2GS installation guide (pvpgn.pro)](https://pvpgn.pro/d2gs_installation.html)
 - [Diablo II files CDN](http://cdn.pvpgn.pro/)
 - [PvPGN server](https://github.com/pvpgn/pvpgn-server)
-- [PvPGN Magic Builder](https://github.com/pvpgn/pvpgn-magic-builder)
+- [PvPGN Magic Builder](https://github.com/pvpgn/pvpgn-magic-builder) (source of the D2GS binaries)
 - [HarpyWar: D2GS under Wine](https://harpywar.com/?a=articles&b=2&c=2&d=21&lang=en)
 - [TurBoss: D2GS under Wine](https://gist.github.com/TurBoss/3624782dd3d50b035e117f232063a999)
-- [wwmoraes/pvpgn-server-docker](https://github.com/wwmoraes/pvpgn-server-docker)
-- [fw42/diablo2 — Battle.net tools](https://github.com/fw42/diablo2)

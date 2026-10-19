@@ -1,2 +1,4 @@
 .env
 config/
+gamefiles/*
+!gamefiles/.gitkeep
