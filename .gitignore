@@ -1,1 +1,4 @@
-d2gs/
+.env
+config/
+gamefiles/*
+!gamefiles/.gitkeep

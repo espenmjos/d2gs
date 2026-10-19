@@ -1,52 +1,52 @@
-FROM ubuntu:16.04
+#
+# Diablo II Closed Game Server (D2GS) running under Wine.
+#
+# Game files are taken from ./gamefiles if present, otherwise downloaded
+# (~1 GB). Run scripts/fetch-gamefiles.sh once to keep a local copy.
 
-RUN dpkg --add-architecture i386
-RUN apt-get update && apt-get install -y \
-  make \
-  wget \
-  flex \
-  bison \
-  xz-utils \
-  lib32z1 \
-  lib32ncurses5 \
-  gcc-multilib \
-  g++-multilib \
-  xserver-xorg-dev:i386 \
-  libfreetype6-dev:i386
+ARG UBUNTU_VERSION=24.04
 
-RUN cd /home && wget http://dl.winehq.org/wine/source/2.0/wine-2.0.1.tar.xz && tar xf wine-2.0.1.tar.xz && rm wine-2.0.1.tar.xz && wget https://gist.githubusercontent.com/HarpyWar/cd3676fa4916ea163c50/raw/50fbbff9a310d98496f458124fac14bda2e16cf0/sock.c && mv sock.c wine-2.0.1/server && mv wine-2.0.1 wine-source && mkdir wine-dirs && mv wine-source wine-dirs && cd wine-dirs && mkdir wine-build && cd wine-build
-WORKDIR "/home/wine-dirs/wine-build"
-RUN ../wine-source/configure --without-x
-RUN make -j 10 && make install -j 10
+############################################################
+# Stage 1: D2GS + Diablo II game files
+############################################################
+FROM ubuntu:${UBUNTU_VERSION} AS files
 
-RUN cd /home && wget https://github.com/pvpgn/pvpgn-magic-builder/archive/v2.29.tar.gz && tar xf v2.29.tar.gz && mv pvpgn-magic-builder-2.29/module/include/d2gs/1.13d d2gs
-COPY conf/d2gs.reg /home/d2gs/
-COPY conf/start.sh /home/d2gs/
-RUN winecfg
-RUN cd /home/d2gs && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Client.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2CMP.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Common.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Game.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2gfx.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Lang.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2MCPClient.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Net.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2sound.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/D2Win.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/Fog.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.13d/Storm.dll && \
-  #wget http://cdn.pvpgn.pro/diablo2/1.13d/Patch_D2.mpq && \   
-  #wget http://cdn.pvpgn.pro/diablo2/ijl11.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/1.14d/Patch_D2.mpq && \
-  wget http://cdn.pvpgn.pro/diablo2/1.14d/ijl11.dll && \
-  wget http://cdn.pvpgn.pro/diablo2/d2speech.mpq && \
-  wget http://cdn.pvpgn.pro/diablo2/d2data.mpq && \
-  wget http://cdn.pvpgn.pro/diablo2/d2sfx.mpq && \
-  wget http://cdn.pvpgn.pro/diablo2/d2exp.mpq && \
-  mv /home/d2gs /root/.wine/drive_c/d2gs 
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates wget \
+ && rm -rf /var/lib/apt/lists/*
 
-WORKDIR "/root/.wine/drive_c/d2gs"
-RUN ["chmod", "+x", "./start.sh"]
+COPY scripts/ /scripts/
+COPY gamefiles/ /d2gs/
+RUN /scripts/fetch-gamefiles.sh /d2gs \
+ && rm -f /d2gs/.gitkeep /d2gs/*.part
 
-ENTRYPOINT ["./start.sh"]
+############################################################
+# Stage 2: runtime
+############################################################
+FROM ubuntu:${UBUNTU_VERSION}
+
+# Wine >= 7 reports socket events the way Windows does, so the old
+# HarpyWar sock.c patch for Wine 2.0 is no longer needed.
+RUN dpkg --add-architecture i386 \
+ && apt-get update \
+ && apt-get install -y --no-install-recommends wine wine32:i386 \
+ && rm -rf /var/lib/apt/lists/* \
+ && useradd --create-home d2gs
+
+ENV WINEPREFIX=/home/d2gs/.wine \
+    WINEARCH=win32 \
+    WINEDEBUG=-all
+
+COPY docker/entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 755 /usr/local/bin/entrypoint.sh
+
+USER d2gs
+RUN wineboot --init && wineserver --wait
+
+COPY --from=files --chown=d2gs:d2gs /d2gs ${WINEPREFIX}/drive_c/d2gs
+WORKDIR ${WINEPREFIX}/drive_c/d2gs
+
+# 4000/tcp: game traffic, 8888/tcp: telnet admin console
+EXPOSE 4000 8888
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
